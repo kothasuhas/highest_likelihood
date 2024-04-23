@@ -22,6 +22,7 @@ parser.add_argument('--model_name', type=str, default="EleutherAI/pythia-70m", h
 parser.add_argument('--num_tokens', type=int, default=50, help='The number of tokens to consider')
 parser.add_argument('--desired_length', type=int, default=1, help='The length of the sequence to find')
 parser.add_argument('--greedy', action='store_true', help='Use greedy decoding instead of DFS')
+parser.add_argument('--input_file', type=str, default="", help="Path to input file with problems to solve")
 args = parser.parse_args()
 
 def get_log_likelihood(token_list_batch, model):
@@ -145,7 +146,7 @@ digits = [
 # extracting common tokens and selecting a small random subset
 TOKEN_CANDIDATES = []
 for digit in digits:
-    token = tokenizer.encode(digit)
+    token = tokenizer.encode(digit)[-1:]
     TOKEN_CANDIDATES += token
 
 TOKEN_CANDIDATES = list(set(TOKEN_CANDIDATES))
@@ -159,80 +160,85 @@ print(BOS_TOKEN)
 print('Trying', len(TOKEN_CANDIDATES), 'tokens')
 print([tokenizer.decode([token]) for token in TOKEN_CANDIDATES])
 
-problem = [
-    "1",
-    "2",
-    "3",
-    "4",
-    "+",
-    "5",
-    "6",
-    "7",
-    "8",
-    "=",
-]
-first_candidate = [BOS_TOKEN]
-for w in problem:
-    first_candidate += tokenizer.encode(digit)
+def compute_highest_likelihood(problem):
+    first_candidate = [BOS_TOKEN]
+    for w in problem:
+        first_candidate += tokenizer.encode(w)[-1:]
+    print(first_candidate)
+    print([tokenizer.decode([token]) for token in first_candidate])
 
-# depth first search while maintaing most likely full length sequence
-candidate_sequences = [first_candidate]
+    # depth first search while maintaing most likely full length sequence
+    candidate_sequences = [first_candidate]
 
-stack = [(candidate_sequence, 0, None) for candidate_sequence in candidate_sequences]  # (sequence, depth, likelihood)
-best_likelihood = -100000000000
-best_sequence = None
-DESIRED_LENGTH = args.desired_length
+    stack = [(candidate_sequence, 0, None) for candidate_sequence in candidate_sequences]  # (sequence, depth, likelihood)
+    best_likelihood = -100000000000
+    best_sequence = None
+    DESIRED_LENGTH = args.desired_length
 
-num_evaluations = 0
+    num_evaluations = 0
 
-filename = f"{'greedy-' if args.greedy else ''}{MODEL_NAME.split('/')[1]}-count{NUM_TOKENS}-len{DESIRED_LENGTH}.log"
-logging.basicConfig(filename=f"logs/{filename}", level=logging.INFO, format='%(message)s', filemode='w')
+    filename = f"{'greedy-' if args.greedy else ''}{MODEL_NAME.split('/')[1]}-count{NUM_TOKENS}-len{DESIRED_LENGTH}.log"
+    logging.basicConfig(filename=f"logs/{filename}", level=logging.INFO, format='%(message)s', filemode='w')
 
-start_time = time()
+    start_time = time()
 
-while stack:
-    candidate_sequence, depth, sequence_likelihood = stack.pop()
+    while stack:
+        candidate_sequence, depth, sequence_likelihood = stack.pop()
 
-    if sequence_likelihood is not None and sequence_likelihood <= best_likelihood:
-        # sequence has no promise
-        continue
-    else:
-        if depth > 0:
-            depth_str = f"{'  '*(depth-1)}{candidate_sequence}, {sequence_likelihood.item()}"
-            print(depth_str)
-            logging.info(depth_str)
-        if depth == DESIRED_LENGTH:
-            # best full length sequence so far
-            best_likelihood = sequence_likelihood
-            best_sequence = candidate_sequence
-            print(f"Best sequence so far: {tokenizer.decode(best_sequence)}")
-            logging.info(f"Best sequence so far: {tokenizer.decode(best_sequence)}")
-            if args.greedy:
-                break
+        if sequence_likelihood is not None and sequence_likelihood <= best_likelihood:
+            # sequence has no promise
+            continue
         else:
-            # get children of this node
-            new_candidate_sequence_batch = [candidate_sequence + [token] for token in TOKEN_CANDIDATES]
-            num_evaluations += 1
-            # evaluate their likelihoods
-            log_likelihoods = get_log_likelihood(new_candidate_sequence_batch, model)
-            # DFS heuristic of sort candidates by likelihood
-            sorted_batch = sorted(zip(log_likelihoods, new_candidate_sequence_batch), key=lambda pair: pair[0])
-            # only keep valid candidates
-            for candidate_log_likelihood, new_candidate_sequence in sorted_batch:
-                assert sequence_likelihood is None or candidate_log_likelihood <= sequence_likelihood
-                if candidate_log_likelihood > best_likelihood:
-                    stack.append((new_candidate_sequence, depth + 1, candidate_log_likelihood))  # push into the stack
+            if depth > 0:
+                depth_str = f"{'  '*(depth-1)}{candidate_sequence}, {sequence_likelihood.item()}"
+                print(depth_str)
+                logging.info(depth_str)
+            if depth == DESIRED_LENGTH:
+                # best full length sequence so far
+                best_likelihood = sequence_likelihood
+                best_sequence = candidate_sequence
+                print(f"Best sequence so far: {tokenizer.decode(best_sequence)}")
+                logging.info(f"Best sequence so far: {tokenizer.decode(best_sequence)}")
+                if args.greedy:
+                    break
+            else:
+                # get children of this node
+                new_candidate_sequence_batch = [candidate_sequence + [token] for token in TOKEN_CANDIDATES]
+                num_evaluations += 1
+                # evaluate their likelihoods
+                log_likelihoods = get_log_likelihood(new_candidate_sequence_batch, model)
+                # DFS heuristic of sort candidates by likelihood
+                sorted_batch = sorted(zip(log_likelihoods, new_candidate_sequence_batch), key=lambda pair: pair[0])
+                # only keep valid candidates
+                for candidate_log_likelihood, new_candidate_sequence in sorted_batch:
+                    assert sequence_likelihood is None or candidate_log_likelihood <= sequence_likelihood
+                    if candidate_log_likelihood > best_likelihood:
+                        stack.append((new_candidate_sequence, depth + 1, candidate_log_likelihood))  # push into the stack
 
-end_time = time()
+    end_time = time()
 
-print('Time taken in seconds:', end_time - start_time)
-print('Number of forward passes:', num_evaluations)
-print('Worst case number of forward passes:', sum([len(TOKEN_CANDIDATES)**i for i in range(DESIRED_LENGTH)]))        
-print('Best sequence:', best_sequence, best_likelihood.item())
-print(tokenizer.decode(best_sequence))
+    print('Time taken in seconds:', end_time - start_time)
+    print('Number of forward passes:', num_evaluations)
+    print('Worst case number of forward passes:', sum([len(TOKEN_CANDIDATES)**i for i in range(DESIRED_LENGTH)]))        
+    print('Best sequence:', best_sequence, best_likelihood.item())
+    print(tokenizer.decode(best_sequence))
 
-logging.info(f"Time taken in seconds: {end_time - start_time}")
-logging.info(f"Number of forward passes: {num_evaluations}")
-logging.info(f"Worst case number of forward passes: {sum([len(TOKEN_CANDIDATES)**i for i in range(DESIRED_LENGTH)])}")
-logging.info(f"Best sequence: {best_sequence}, {best_likelihood.item()}")
-logging.info(tokenizer.decode(best_sequence))
+    logging.info(f"Time taken in seconds: {end_time - start_time}")
+    logging.info(f"Number of forward passes: {num_evaluations}")
+    logging.info(f"Worst case number of forward passes: {sum([len(TOKEN_CANDIDATES)**i for i in range(DESIRED_LENGTH)])}")
+    logging.info(f"Best sequence: {best_sequence}, {best_likelihood.item()}")
+    logging.info(tokenizer.decode(best_sequence))
+    if best_sequence:
+        return tokenizer.decode(best_sequence)
+    else:
+        return []
+
+if args.input_file != "":
+    lines = open(args.input_file).read().splitlines()
+else:
+    lines = []
+
+for problem in lines:
+    result = compute_highest_likelihood(problem)
+    print(result)
+
