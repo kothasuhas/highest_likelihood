@@ -49,6 +49,7 @@ def forward(
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
     return_dict: Optional[bool] = None,
+    cache_position: Optional[int] = None,
 ) :
     return_dict = return_dict if return_dict is not None else model.config.use_return_dict
 
@@ -68,6 +69,21 @@ def forward(
         )
         hidden_states = outputs[0]
         lm_logits = model.embed_out(hidden_states)
+    elif hasattr(model, "model"):
+        outputs = model.model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            cache_position=cache_position,
+        )
+        hidden_states = outputs[0]
+        lm_logits = model.lm_head(hidden_states)
     elif hasattr(model, "transformer"):
         outputs = model.transformer(
             input_ids,
