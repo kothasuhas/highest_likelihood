@@ -161,11 +161,14 @@ print('Trying', len(TOKEN_CANDIDATES), 'tokens')
 print([tokenizer.decode([token]) for token in TOKEN_CANDIDATES])
 
 def compute_highest_likelihood(problem):
-    first_candidate = [BOS_TOKEN]
-    for w in problem:
-        first_candidate += tokenizer.encode(w)[-1:]
-    print(first_candidate)
-    print([tokenizer.decode([token]) for token in first_candidate])
+    # first_candidate = [BOS_TOKEN]
+    first_candidate = tokenizer.encode(problem)
+    # for w in problem:
+    #     first_candidate += tokenizer.encode(w)[-1:]
+    print('Problem:', problem)
+    print('Root tokens:', first_candidate)
+    # print([tokenizer.decode([token]) for token in first_candidate])
+    print('Root decoded:', tokenizer.decode(first_candidate))
 
     # depth first search while maintaing most likely full length sequence
     candidate_sequences = [first_candidate]
