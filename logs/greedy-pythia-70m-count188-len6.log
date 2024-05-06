@@ -1,0 +1,12 @@
+[0, 510], -3.0312020778656006
+  [0, 510, 767], -10.19094467163086
+    [0, 510, 767, 275], -16.059904098510742
+      [0, 510, 767, 275, 253], -17.21559715270996
+        [0, 510, 767, 275, 253, 767], -21.541736602783203
+          [0, 510, 767, 275, 253, 767, 275], -24.343969345092773
+Best sequence so far: <|endoftext|>The two in the two in
+Time taken in seconds: 6.232001304626465
+Number of forward passes: 6
+Worst case number of forward passes: 236105165709
+Best sequence: [0, 510, 767, 275, 253, 767, 275], -24.343969345092773
+<|endoftext|>The two in the two in

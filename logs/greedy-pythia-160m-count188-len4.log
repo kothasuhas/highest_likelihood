@@ -1,0 +1,10 @@
+[0, 510], -2.9654641151428223
+  [0, 510, 767], -9.588604927062988
+    [0, 510, 767, 403], -13.144752502441406
+      [0, 510, 767, 403, 253], -16.462594985961914
+Best sequence so far: <|endoftext|>The two are the
+Time taken in seconds: 8.232190370559692
+Number of forward passes: 4
+Worst case number of forward passes: 6680205
+Best sequence: [0, 510, 767, 403, 253], -16.462594985961914
+<|endoftext|>The two are the
